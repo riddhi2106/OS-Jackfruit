@@ -25,19 +25,24 @@ sudo make module # Build kernel module
 
 # 2. Load Kernel Module
 echo -e "\n${BLUE}[2/8] Loading Kernel Module...${NC}"
+sudo rmmod monitor 2>/dev/null || true
 sudo insmod monitor.ko
 ls -l /dev/container_monitor
 
 # 3. Setup RootFS
 echo -e "\n${BLUE}[3/8] Preparing Root Filesystems...${NC}"
 mkdir -p rootfs-base
-# Assuming alpine-minirootfs is already downloaded or we use a dummy for demo
 if [ ! -d "rootfs-base/bin" ]; then
-    echo -e "${RED}Error: rootfs-base is not populated. Please run the setup steps from README first.${NC}"
-    # exit 1
+    echo -e "${BLUE}Downloading ARM64 Alpine Rootfs...${NC}"
+    wget -qO alpine.tar.gz https://dl-cdn.alpinelinux.org/alpine/v3.20/releases/aarch64/alpine-minirootfs-3.20.3-aarch64.tar.gz
+    tar -xzf alpine.tar.gz -C rootfs-base
+    rm alpine.tar.gz
 fi
 
-rm -rf rootfs-alpha rootfs-beta
+sudo umount rootfs-alpha/proc 2>/dev/null || true
+sudo umount rootfs-beta/proc 2>/dev/null || true
+sudo umount rootfs-gamma/proc 2>/dev/null || true
+rm -rf rootfs-alpha rootfs-beta rootfs-gamma
 cp -a rootfs-base rootfs-alpha
 cp -a rootfs-base rootfs-beta
 

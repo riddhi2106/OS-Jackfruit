@@ -404,8 +404,16 @@ int child_fn(void *arg)
         perror("child: sethostname");
         return 1;
     }
+    // Ensure mount namespace changes are private and don't propagate back to host
+    if (mount(NULL, "/", NULL, MS_PRIVATE | MS_REC, NULL) < 0) {
+        perror("mount private");
+        exit(1);
+    }
 
-    // 2. Filesystem Isolation (chroot)
+    /* 
+     * Task 1: Setup namespaces and chroot
+     * 1. Change root to config->rootfs
+     */
     if (chroot(config->rootfs) != 0) {
         perror("child: chroot");
         return 1;

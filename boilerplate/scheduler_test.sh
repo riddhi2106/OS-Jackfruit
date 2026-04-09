@@ -14,6 +14,14 @@ prompt_screenshot() {
 # Build all workloads
 make ci
 
+mkdir -p rootfs-base
+if [ ! -d "rootfs-base/bin" ]; then
+    echo -e "\033[0;34mDownloading ARM64 Alpine Rootfs...\033[0m"
+    wget -qO alpine.tar.gz https://dl-cdn.alpinelinux.org/alpine/v3.20/releases/aarch64/alpine-minirootfs-3.20.3-aarch64.tar.gz
+    tar -xzf alpine.tar.gz -C rootfs-base
+    rm alpine.tar.gz
+fi
+
 # Setup rootfs for tests
 cp -a rootfs-base rootfs-test1
 cp -a rootfs-base rootfs-test2
@@ -51,6 +59,9 @@ prompt_screenshot "7" "Scheduling experiment (Shows terminal output indicating d
 
 # Cleanup
 sudo kill $SUPERVISOR_PID
+sudo umount rootfs-test1/proc 2>/dev/null || true
+sudo umount rootfs-test2/proc 2>/dev/null || true
+sudo umount rootfs-test3/proc 2>/dev/null || true
 sudo rm -rf rootfs-test1 rootfs-test2 rootfs-test3
 
 echo -e "\n\033[0;34m== Experiments Complete ==\033[0m"
