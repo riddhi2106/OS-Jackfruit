@@ -90,8 +90,8 @@ prompt_screenshot "5 & 6" "Soft-limit warning & Hard-limit enforcement (Shows th
 
 # 8. Clean Teardown
 echo -e "\n${BLUE}[8/8] Cleaning up...${NC}"
-sudo ./engine stop alpha
-sudo ./engine stop beta
+sudo ./engine stop alpha 2>/dev/null || true
+sudo ./engine stop beta 2>/dev/null || true
 sleep 2
 sudo ./engine ps
 
