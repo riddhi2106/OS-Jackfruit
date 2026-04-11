@@ -20,8 +20,8 @@ prompt_screenshot() {
 # 1. Build project
 echo -e "\n${BLUE}[1/8] Building project...${NC}"
 make clean
-make ci # Build user-space binaries first
-sudo make module # Build kernel module
+make # Build user-space binaries and module statically
+
 
 # 2. Load Kernel Module
 echo -e "\n${BLUE}[2/8] Loading Kernel Module...${NC}"

@@ -12,7 +12,8 @@ prompt_screenshot() {
 }
 
 # Build all workloads
-make ci
+make clean
+make
 
 mkdir -p rootfs-base
 if [ ! -d "rootfs-base/bin" ]; then
