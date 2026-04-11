@@ -31,15 +31,47 @@ chmod +x demo.sh
 sudo ./demo.sh
 ```
 
-### 2.4 Manual Execution
-1. **Load Module**: `sudo insmod monitor.ko`
-2. **Start Supervisor**: `sudo ./engine supervisor ./rootfs-base`
-3. **CLI Usage (another terminal)**:
-   - `sudo ./engine start <id> <rootfs> <command>`
-   - `sudo ./engine run <id> <rootfs> <command>`
-   - `sudo ./engine ps`
-   - `sudo ./engine logs <id>`
-   - `sudo ./engine stop <id>`
+### 2.4 Manual Execution (Reference Run Sequence)
+If you prefer not to use the automated `demo.sh`, you can reproduce the exact setup manually using these commands:
+
+```bash
+# 1. Build user-space binaries and module
+make
+
+# 2. Load kernel module and verify
+sudo insmod monitor.ko
+ls -l /dev/container_monitor
+
+# 3. Start supervisor in the background
+sudo ./engine supervisor ./rootfs-base &
+
+# 4. Create per-container writable rootfs copies
+cp -a ./rootfs-base ./rootfs-alpha
+cp -a ./rootfs-base ./rootfs-beta
+
+# 5. Start two containers
+sudo ./engine start alpha ./rootfs-alpha /cpu_hog --soft-mib 48 --hard-mib 80
+sudo ./engine start beta ./rootfs-beta /cpu_hog --soft-mib 64 --hard-mib 96
+
+# 6. List tracked containers
+sudo ./engine ps
+
+# 7. Inspect one container
+sudo ./engine logs alpha
+
+# 8. Stop containers
+sudo ./engine stop alpha
+sudo ./engine stop beta
+
+# 9. Stop supervisor 
+sudo pkill -9 engine
+
+# 10. Inspect kernel logs for memory kills
+dmesg | tail
+
+# 11. Unload module
+sudo rmmod monitor
+```
 
 ---
 
@@ -99,15 +131,32 @@ Using **Nice values**, we observed that:
 
 ## 5. Design Decisions and Tradeoffs
 
-- **Thread-per-CLI Request**:
-  - *Decision*: Each CLI connection spawns a short-lived supervisor thread.
-  - *Tradeoff*: Increases overhead for many concurrent CLI connections but ensures the supervisor never blocks on one client (e.g., during a `run` command).
-- **Periodic Timer Monitoring**:
-  - *Decision*: Kernel monitor uses a 1-second timer to check RSS.
-  - *Tradeoff*: 1-second granularity is low overhead but might miss very brief memory spikes between checks.
-- **UNIX Domain Sockets over FIFOs**:
-  - *Decision*: Used UDS for the control-plane.
-  - *Tradeoff*: More complex than FIFOs but provides bi-directional stream-based communication, which is better for complex request/response structures.
+## 5. Design Decisions and Tradeoffs
+
+### 5.1 Namespace Isolation
+- **Choice**: Combined `CLONE_NEWPID`, `CLONE_NEWUTS`, and `CLONE_NEWNS` with a direct `chroot()` to an Alpine filesystem. We also utilized `MS_PRIVATE` for mount propagation.
+- **Tradeoff**: Running a full `chroot` requires downloading and storing an entire root filesystem for every container, using significantly more disk space than simply copying a single executable.
+- **Justification**: This provides true, comprehensive filesystem isolation similar to Docker. If we only used `pivot_root` or mounted a single binary, the container would lack standard utilities (like `/bin/sh`) which are critical for testing robust generic multi-process environments.
+
+### 5.2 Supervisor Architecture
+- **Choice**: The supervisor uses a **thread-per-CLI-request** concurrency model. When a CLI connects, a new thread `client_handler_thread` handles the entire socket interaction.
+- **Tradeoff**: Thread creation carries inherent OS overhead. If 1,000 CLI clients connected simultaneously, thread thrashing could occur, increasing CPU load.
+- **Justification**: It ensures the main supervisor loop (which controls container lifecycle and signaling) is never blocked by a slow CLI client. This allows `run` commands to block the specific CLI thread while the supervisor remains wildly responsive to other containers starting/stopping.
+
+### 5.3 IPC and Logging
+- **Choice**: We used a **UNIX Domain Socket** for the control plane and a **Bounded-Buffer Producer-Consumer queue** for the logging plane.
+- **Tradeoff**: A bounded buffer drops logs or blocks producers when completely full, and requires complex mutex/condition-variable synchronization compared to simply writing directly to a file from the container.
+- **Justification**: Direct file I/O from a restricted `chroot` container is messy and breaks isolation. The bounded buffer acts as a centralized routing system on the host side, allowing the supervisor to safely intercept and persist standard output/error securely without giving the containers any host-level filesystem access.
+
+### 5.4 Kernel Monitor
+- **Choice**: Implemented periodic RSS monitoring via a Linux kernel `timer_list` firing every 1 second, executing `timer_callback`.
+- **Tradeoff**: A 1-second polling frequency is a relatively low resolution. A malicious program could theoretically spike memory usage to crash the system within an 800ms window before the next polling cycle catches it.
+- **Justification**: Using high-frequency timers or hooking deeper into the VM page allocation paths would be extremely complex and incur severe performance penalties. The 1s timer operates perfectly within acceptable bounds for most user-space constraints without bogging down the OS.
+
+### 5.5 Scheduling Experiments
+- **Choice**: Used computationally heavy integer loops (`cpu_hog`) artificially throttled by different `nice` values to test the Completely Fair Scheduler (CFS).
+- **Tradeoff**: `cpu_hog` is an entirely synthetic benchmark that does not reflect real-world mixed I/O and computing workloads (like a web server or database).
+- **Justification**: A synthetic, purely CPU-bound infinite loop eliminates external variables (like disk speed or network latency), allowing us to measure exactly how the Linux scheduler distributes CPU timeshares strictly based on `nice` weight differences.
 
 ---
 
