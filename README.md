@@ -1,8 +1,8 @@
-# Multi-Container Runtime (Project Jackfruit)
+# Multi-Container Runtime (Jackfruit Problem)
 
 **Team Members:**
-- [Riddhi Mundada] ([PES1UG24CS372])
-- [Samika Ojha] ([PES1UG24CS412])
+- Riddhi Mundada [PES1UG24CS372]
+- Samika Ojha [PES1UG24CS412]
 
 ---
 
