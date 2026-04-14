@@ -131,8 +131,6 @@ Using **Nice values**, we observed that:
 
 ## 5. Design Decisions and Tradeoffs
 
-## 5. Design Decisions and Tradeoffs
-
 ### 5.1 Namespace Isolation
 - **Choice**: Combined `CLONE_NEWPID`, `CLONE_NEWUTS`, and `CLONE_NEWNS` with a direct `chroot()` to an Alpine filesystem. We also utilized `MS_PRIVATE` for mount propagation.
 - **Tradeoff**: Running a full `chroot` requires downloading and storing an entire root filesystem for every container, using significantly more disk space than simply copying a single executable.

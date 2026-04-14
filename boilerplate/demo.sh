@@ -69,6 +69,8 @@ prompt_screenshot "1 & 2" "Multi-container supervision & Metadata tracking (Show
 # 6. Logging Pipeline Demo
 echo -e "\n${BLUE}[6/8] Verifying Logs...${NC}"
 sleep 3
+echo "./engine logs alpha"
+./engine logs alpha
 echo -e "${GREEN}Logs for alpha:${NC}"
 sudo ./engine logs alpha | head -n 5
 
