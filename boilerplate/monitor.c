@@ -139,18 +139,25 @@ static void timer_callback(struct timer_list *t)
             continue;
         }
 
+                /* 🔹 SOFT LIMIT FIRST */
+        if (rss > entry->soft_limit_bytes && !entry->soft_limit_warned) {
+            log_soft_limit_event(entry->container_id, entry->pid,
+                                entry->soft_limit_bytes, rss);
+            entry->soft_limit_warned = 1;
+        }
+
+        /* 🔹 HARD LIMIT AFTER */
         if (rss > entry->hard_limit_bytes) {
-            kill_process(entry->container_id, entry->pid, entry->hard_limit_bytes, rss);
+            kill_process(entry->container_id, entry->pid,
+                        entry->hard_limit_bytes, rss);
             list_del(&entry->list);
             kfree(entry);
             continue;
         }
 
-        if (rss > entry->soft_limit_bytes && !entry->soft_limit_warned) {
-            log_soft_limit_event(entry->container_id, entry->pid, entry->soft_limit_bytes, rss);
-            entry->soft_limit_warned = 1;
-        } else if (rss <= entry->soft_limit_bytes) {
-            entry->soft_limit_warned = 0; // Reset warning if they go back under
+        /* Reset if goes back below soft limit */
+        if (rss <= entry->soft_limit_bytes) {
+            entry->soft_limit_warned = 0;
         }
     }
     mutex_unlock(&monitor_lock);
@@ -183,10 +190,19 @@ static long monitor_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
                req.container_id, req.pid, req.soft_limit_bytes, req.hard_limit_bytes);
 
         struct monitor_entry *new_entry = kmalloc(sizeof(*new_entry), GFP_KERNEL);
-        if (!new_entry) return -ENOMEM;
+        if (!new_entry)
+            return -ENOMEM;
+
+        /* Initialize memory properly */
+        memset(new_entry, 0, sizeof(*new_entry));
 
         new_entry->pid = req.pid;
-        strncpy(new_entry->container_id, req.container_id, sizeof(new_entry->container_id)-1);
+
+        /* Safe string copy */
+        strncpy(new_entry->container_id, req.container_id,
+                sizeof(new_entry->container_id) - 1);
+        new_entry->container_id[sizeof(new_entry->container_id) - 1] = '\0';
+
         new_entry->soft_limit_bytes = req.soft_limit_bytes;
         new_entry->hard_limit_bytes = req.hard_limit_bytes;
         new_entry->soft_limit_warned = 0;
@@ -216,7 +232,8 @@ static long monitor_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
     }
     mutex_unlock(&monitor_lock);
 
-    if (found) return 0;
+    if (found)
+        return 0;
 
     return -ENOENT;
 }

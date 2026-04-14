@@ -78,15 +78,15 @@ prompt_screenshot "3 & 4" "Bounded-buffer logging & CLI IPC (Shows the 'logs' re
 
 # 7. Memory Limit Enforcement Demo
 echo -e "\n${BLUE}[7/8] Demonstrating Memory Limits...${NC}"
-echo -e "Starting 'gamma' with memory_hog (hard limit 50MiB)..."
+echo -e "Starting 'gamma' with memory_hog (hard limit 200MiB)..."
 cp -a rootfs-base rootfs-gamma
 cp memory_hog rootfs-gamma/
-sudo ./engine start gamma ./rootfs-gamma "/memory_hog 100" --soft-mib 20 --hard-mib 50
-sleep 5
+sudo ./engine start gamma ./rootfs-gamma "/memory_hog 300" --soft-mib 20 --hard-mib 200
+sleep 8
 echo -e "${GREEN}Verifying gamma state after limit hit:${NC}"
 sudo ./engine ps | grep gamma || true
 echo -e "${GREEN}Kernel logs (dmesg):${NC}"
-sudo dmesg | tail -n 5 | grep container_monitor || true
+sudo dmesg | tail -n 10 | grep container_monitor || true
 
 prompt_screenshot "5 & 6" "Soft-limit warning & Hard-limit enforcement (Shows the kernel dmesg logs for limits)"
 
